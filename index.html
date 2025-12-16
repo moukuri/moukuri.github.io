@@ -1,3 +1,6 @@
+Here’s your same page, but with a **JavaScript canvas architectural construction animation** (blueprint grid + building “grows” + crane hook moving). Copy/paste this whole file:
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -18,9 +21,20 @@
     overflow: hidden;
   }
 
+  /* Canvas behind text */
+  canvas{
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+  }
+
   .box {
     text-align: center;
     animation: float 3s ease-in-out infinite;
+    z-index: 1;
+    position: relative;
   }
 
   h1 {
@@ -65,11 +79,167 @@
 </head>
 
 <body>
+  <canvas id="arch"></canvas>
+
   <div class="box">
     <h1>Moukuri Mohim</h1>
     <p>Architect</p>
     <p>Website Under Construction</p>
     <div class="loader"></div>
   </div>
+
+<script>
+const canvas = document.getElementById("arch");
+const ctx = canvas.getContext("2d");
+let W=0, H=0, dpr=1;
+
+function resize(){
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.floor(W*dpr);
+  canvas.height = Math.floor(H*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+function grid(){
+  ctx.save();
+  ctx.globalAlpha = 0.12;
+  ctx.strokeStyle = "#7cf7ff";
+  ctx.lineWidth = 1;
+  const s1 = 24, s2 = 96;
+
+  ctx.beginPath();
+  for(let x=0;x<=W;x+=s1){ ctx.moveTo(x,0); ctx.lineTo(x,H); }
+  for(let y=0;y<=H;y+=s1){ ctx.moveTo(0,y); ctx.lineTo(W,y); }
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.10;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  for(let x=0;x<=W;x+=s2){ ctx.moveTo(x,0); ctx.lineTo(x,H); }
+  for(let y=0;y<=H;y+=s2){ ctx.moveTo(0,y); ctx.lineTo(W,y); }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function draw(time){
+  const t = time/1000;
+
+  ctx.clearRect(0,0,W,H);
+  grid();
+
+  // Building params
+  const cx = W/2;
+  const base = H*0.78;
+  const bw = Math.min(320, W*0.48);
+  const bh = Math.min(360, H*0.46);
+  const left = cx - bw/2;
+
+  // cycle progress 0..1
+  const P = (t*0.12)%1;
+  const floors = 10;
+  const fh = bh/floors;
+  const built = Math.max(1, Math.floor(P*floors));
+
+  // Ground line
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx-420, base);
+  ctx.lineTo(cx+420, base);
+  ctx.stroke();
+
+  // Building outline
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(left, base-bh, bw, bh);
+
+  // Built floors lines
+  ctx.strokeStyle = "rgba(124,247,255,0.75)";
+  ctx.lineWidth = 1.6;
+  for(let f=0; f<=built; f++){
+    const y = base - f*fh;
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(left+bw, y);
+    ctx.stroke();
+  }
+
+  // Columns (only up to built height)
+  ctx.globalAlpha = 0.55;
+  for(let c=1;c<4;c++){
+    const x = left + (bw/4)*c;
+    ctx.beginPath();
+    ctx.moveTo(x, base);
+    ctx.lineTo(x, base - built*fh);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Scaffolding hatch (moving diagonals)
+  const topY = base - built*fh;
+  ctx.strokeStyle = "rgba(182,255,124,0.35)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const shift = (t*30)%20;
+  for(let i=0;i<26;i++){
+    const y = topY + i*10;
+    ctx.moveTo(left-60+shift, y);
+    ctx.lineTo(left+bw+60+shift, y-90);
+  }
+  ctx.stroke();
+
+  // Crane
+  const mastX = cx + bw/2 + 120;
+  const mastTop = base - bh - 120;
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.moveTo(mastX, base);
+  ctx.lineTo(mastX, mastTop);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(mastX, mastTop);
+  ctx.lineTo(mastX - 360, mastTop + 10);
+  ctx.stroke();
+
+  // Hook swing + load
+  const swing = Math.sin(t*2)*18;
+  const hookX = mastX - 200 + swing;
+  const hookY = mastTop + 10 + (Math.abs(Math.cos(t*2))*60);
+
+  ctx.strokeStyle = "rgba(124,247,255,0.85)";
+  ctx.lineWidth = 1.5;
+
+  ctx.beginPath();
+  ctx.moveTo(mastX - 200, mastTop + 10);
+  ctx.lineTo(hookX, hookY);
+  ctx.stroke();
+
+  // Load block
+  ctx.fillStyle = "rgba(124,247,255,0.35)";
+  ctx.strokeStyle = "rgba(124,247,255,0.85)";
+  const blockW = 34, blockH = 20;
+  ctx.fillRect(hookX - blockW/2, hookY, blockW, blockH);
+  ctx.strokeRect(hookX - blockW/2, hookY, blockW, blockH);
+
+  // Place load on top when close (simple illusion)
+  const nearTop = hookY + blockH > topY - 8 && hookY < topY + 30;
+  if(nearTop){
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = "rgba(182,255,124,0.45)";
+    ctx.fillRect(left + bw*0.25, topY - 6, bw*0.5, 12);
+    ctx.globalAlpha = 1;
+  }
+
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+</script>
 </body>
 </html>
+```
